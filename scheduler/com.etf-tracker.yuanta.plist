@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS launchd job：每個工作日 17:30 抓元大 PCF 並歸檔。
+  不會自動啟動 server；只負責累積每日 CSV。重啟 server 後再用 reingest-all.js 回灌。
+
+  安裝（一次性）：
+    cp /Users/roy/ETF/scheduler/com.etf-tracker.yuanta.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.etf-tracker.yuanta.plist
+    launchctl start com.etf-tracker.yuanta
+
+  停用：
+    launchctl unload ~/Library/LaunchAgents/com.etf-tracker.yuanta.plist
+
+  注意：此 plist 假設 server 在 localhost:3000 跑著；--ingest 才會灌進 DB。
+  若 server 沒開仍會歸檔 daily-snapshots/，後續用 reingest-all.js 回灌。
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.etf-tracker.yuanta</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/roy/ETF/fetch.js</string>
+    <string>0050</string>
+    <string>0056</string>
+    <string>--ingest</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/roy/ETF</string>
+
+  <!-- 每週一~五 17:30 跑（盤後 PCF 揭露完成）-->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+
+  <!-- 開機後若錯過排程時間，立即跑一次 -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/etf-tracker-yuanta.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/etf-tracker-yuanta.err.log</string>
+</dict>
+</plist>

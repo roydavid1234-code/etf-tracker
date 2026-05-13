@@ -1,0 +1,22 @@
+{
+  "name": "etf-tracker",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Taiwan ETF holdings tracker — per-stock / per-ETF / per-day views with multi-issuer fetchers",
+  "scripts": {
+    "test": "node --test test/aggregate.test.js test/integration.test.js test/views.test.js test/all-etfs.test.js",
+    "demo": "node demo.js",
+    "cli":  "node cli.js",
+    "server": "node server.js",
+    "server:reset": "ETF_DB_RESET=1 node server.js",
+    "server:clean": "ETF_DB_RESET=1 ETF_DB_NO_SEED=1 node server.js",
+    "server:memory": "ETF_DB_PATH=:memory: node server.js",
+    "fetch": "node fetch.js",
+    "fetch:yuanta": "node fetch-yuanta.js",
+    "reingest": "node reingest-all.js",
+    "issuer-pages": "node open-issuer-pages.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
+  }
+}

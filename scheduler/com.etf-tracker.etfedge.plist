@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ⚠️ 警示：etfedge.xyz robots.txt 明文 `Disallow: /preview/*.json$`。
+     此排程是使用者明確要求並承擔風險的決定（請勿視為「我認為這 OK」）。
+     使用條件：個人非商業、不重新發佈、僅一日一次低頻。
+
+  停用：
+    launchctl unload ~/Library/LaunchAgents/com.etf-tracker.etfedge.plist
+    rm ~/Library/LaunchAgents/com.etf-tracker.etfedge.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.etf-tracker.etfedge</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/roy/ETF/fetch-etfedge.js</string>
+    <string>00981A</string>
+    <string>00991A</string>
+    <string>00992A</string>
+    <string>--ingest</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/roy/ETF</string>
+
+  <!-- 工作日 18:30（盤後 PCF 揭露完成） -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/etf-tracker-etfedge.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/etf-tracker-etfedge.err.log</string>
+</dict>
+</plist>

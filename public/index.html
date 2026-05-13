@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>ETF 持股追蹤</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #FAF6EE; --panel: #FFFFFF; --border: #DDD6C5;
+    --fg: #2D2A26; --muted: #8A8478;
+    --buy: #6B8E5A; --sell: #C76760; --accent: #4A6FA5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+         font-family: "Hiragino Sans", "Yu Gothic Medium", "Yu Gothic", "Noto Sans JP", "Noto Sans TC", "PingFang TC", -apple-system, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 16px; cursor: pointer; color: var(--muted);
+         border-bottom: 2px solid transparent; font-size: 14px; user-select: none; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .controls { background: var(--panel); border: 1px solid var(--border);
+              border-radius: 8px; padding: 14px; margin-bottom: 16px;
+              display: grid; gap: 10px;
+              grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .controls label { display: flex; flex-direction: column; gap: 4px;
+                    font-size: 12px; color: var(--muted); }
+  .controls input[type=text], .controls input[type=date], .controls select {
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; font-size: 14px;
+  }
+  .controls button.primary {
+    grid-column: 1 / -1;
+    background: var(--accent); color: #FAF6EE; border: 0;
+    border-radius: 6px; padding: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  .controls button.primary:hover { filter: brightness(1.1); }
+
+  .modes { display: flex; gap: 6px; grid-column: 1 / -1; flex-wrap: wrap; }
+  .modes label { flex-direction: row; align-items: center; gap: 6px;
+                 background: var(--bg); border: 1px solid var(--border);
+                 padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+                 color: var(--fg); }
+  .modes label.active { border-color: var(--accent); color: var(--accent); }
+  .modes input { display: none; }
+
+  /* ETF 多選清單 */
+  .etf-multi { grid-column: 1 / -1; background: var(--bg); border: 1px solid var(--border);
+               border-radius: 6px; padding: 12px; }
+  .etf-multi-header { display: flex; justify-content: space-between; align-items: center;
+                      margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+  .etf-multi-header .link { background: none; border: 0; color: var(--accent); cursor: pointer;
+                            font-size: 12px; padding: 0 6px; }
+  .etf-multi-header .link:hover { text-decoration: underline; }
+  .etf-list { display: grid; gap: 6px;
+              grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .etf-list label { flex-direction: row; align-items: center; gap: 6px;
+                    padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px;
+                    cursor: pointer; font-size: 13px; color: var(--fg);
+                    font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .etf-list label:has(input:checked) { border-color: var(--accent); color: var(--accent); background: rgba(74, 111, 165, 0.08); }
+  .etf-list input { margin: 0; accent-color: var(--accent); }
+  .etf-multi-collapsed { padding: 0; }
+  .etf-multi-collapsed .etf-list { display: none; }
+
+  /* collapsible：只顯示第一排，點 ▾ 展開 */
+  .etf-multi.collapsible.collapsed .etf-list {
+    max-height: 40px; overflow: hidden; position: relative;
+  }
+  .etf-multi.collapsible.collapsed .etf-list::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 16px;
+    background: linear-gradient(transparent, var(--bg));
+    pointer-events: none;
+  }
+  .link.toggle { color: var(--accent); }
+
+  section.results { display: grid; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border);
+           border-radius: 8px; overflow: hidden; }
+  .panel header { padding: 12px 16px; border-bottom: 1px solid var(--border);
+                  display: flex; justify-content: space-between; align-items: baseline; }
+  .panel header h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .panel header h2.buy  { color: var(--buy); }
+  .panel header h2.sell { color: var(--sell); }
+  .count { color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px;
+       text-transform: uppercase; letter-spacing: 0.4px; background: var(--bg); }
+  tr:last-child td { border-bottom: 0; }
+  .etf, .stock { font-family: ui-monospace, SF Mono, Menlo, monospace; font-weight: 600; }
+  .num  { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .num.buy  { color: var(--buy); }
+  .num.sell { color: var(--sell); }
+  .daily { color: var(--muted); font-size: 12px; font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .empty { padding: 24px; color: var(--muted); text-align: center; font-size: 13px; }
+  .err { background: #F8E1DD; border: 1px solid var(--sell); color: var(--sell);
+         padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+  .err:empty { display: none; }
+  .ok  { background: #E1F0DD; border: 1px solid var(--buy); color: var(--buy);
+         padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+  .ok:empty { display: none; }
+  .etf-pill { display: inline-block; background: var(--bg); border: 1px solid var(--border);
+              padding: 2px 8px; border-radius: 4px; margin-right: 6px; font-size: 12px;
+              font-family: ui-monospace, SF Mono, Menlo, monospace; }
+  .etf-pill.buy  { border-color: var(--buy); color: var(--buy); }
+  .etf-pill.sell { border-color: var(--sell); color: var(--sell); }
+  .etf-card-title { font-family: ui-monospace, SF Mono, Menlo, monospace;
+                    font-size: 15px; font-weight: 700; color: var(--accent); }
+  details.help { margin: 12px 0 16px; color: var(--muted); font-size: 13px; }
+  details.help summary { cursor: pointer; }
+  details.help code { background: var(--panel); border: 1px solid var(--border);
+                      border-radius: 4px; padding: 2px 6px; font-size: 12px; }
+
+  /* ─── Calendar popup ─── */
+  #cal { position: absolute; z-index: 999; background: var(--panel);
+         border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+         box-shadow: 0 8px 24px rgba(45, 42, 38, 0.12); min-width: 280px; }
+  #cal.hidden { display: none; }
+  .cal-head { display: flex; justify-content: space-between; align-items: center;
+              margin-bottom: 10px; }
+  .cal-head button { background: transparent; border: 1px solid var(--border);
+                     color: var(--fg); width: 28px; height: 28px; border-radius: 4px;
+                     cursor: pointer; font-size: 16px; line-height: 1; }
+  .cal-head button:hover { border-color: var(--accent); color: var(--accent); }
+  .cal-title { font-weight: 600; color: var(--fg); font-size: 14px; }
+  .cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-week { color: var(--muted); font-size: 11px; text-align: center;
+              padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+             font-size: 13px; color: var(--fg); cursor: pointer; border-radius: 4px;
+             position: relative; }
+  .cal-day:hover:not(.cal-empty) { background: rgba(88,166,255,0.15); }
+  .cal-day.cal-empty { color: var(--muted); opacity: 0.3; cursor: default; }
+  .cal-day.cal-other-month { opacity: 0.25; }
+  .cal-day.cal-has-data::after { content: ''; position: absolute; bottom: 3px;
+                                  width: 4px; height: 4px; background: var(--buy);
+                                  border-radius: 50%; }
+  .cal-day.cal-selected { background: var(--accent); color: #FAF6EE; font-weight: 700; }
+  .cal-day.cal-today { border: 1px solid var(--muted); }
+  .cal-footer { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+                font-size: 11px; color: var(--muted); text-align: center; }
+  .cal-footer span { color: var(--buy); }
+</style>
+</head>
+<body>
+
+<button id="backBtn" type="button"
+  style="position:fixed; top:16px; right:16px; z-index:9999;
+         padding:10px 20px; font-size:14px; font-weight:600; letter-spacing:0.1em;
+         background:#4A6FA5; color:#FFFFFF;
+         border:1px solid #4A6FA5; border-radius:6px; cursor:pointer;
+         box-shadow:0 2px 8px rgba(74, 111, 165, 0.25); transition:background 0.15s, box-shadow 0.15s;"
+  onmouseover="this.style.background='#3D5E8D';this.style.boxShadow='0 4px 12px rgba(74, 111, 165, 0.35)'"
+  onmouseout="this.style.background='#4A6FA5';this.style.boxShadow='0 2px 8px rgba(74, 111, 165, 0.25)'"
+  onclick="if (document.referrer && new URL(document.referrer).origin === location.origin) history.back(); else location.href='/';"
+>← 返回</button>
+
+<h1>ETF 持股追蹤
+  <button id="refreshBtn" style="margin-left:12px; vertical-align:middle; font-size:13px; padding:6px 12px; background:var(--panel); color:var(--accent); border:1px solid var(--accent); border-radius:6px; cursor:pointer; font-weight:600">↻ 立刻刷新資料</button>
+</h1>
+<div class="sub" id="dbStatus">載入 DB 狀態中…</div>
+
+<div class="tabs">
+  <div class="tab active" data-view="stock">個股視角</div>
+  <div class="tab" data-view="etf">ETF 視角</div>
+  <div class="tab" data-view="added">當日新增股票</div>
+</div>
+
+<div class="err" id="err"></div>
+<div class="ok"  id="ok"></div>
+
+<!-- 個股視角 -->
+<div class="controls" id="ctrlStock">
+  <div class="etf-multi collapsible collapsed">
+    <div class="etf-multi-header">
+      <span class="title">選擇股票（可多選）</span>
+      <span>
+        <button type="button" class="link toggle">▾ 展開</button>
+        <button type="button" class="link" data-target="stockPick" data-action="all">全選</button>
+        <button type="button" class="link" data-target="stockPick" data-action="none">清除</button>
+        <span id="stockPickCount" style="margin-left:8px">已選 0 支</span>
+      </span>
+    </div>
+    <div class="etf-list" id="stockPick"></div>
+  </div>
+  <label style="grid-column:1/-1">自訂額外股票代號（逗號分隔，未在清單中時用此）
+    <input type="text" id="stockExtra" placeholder="例如：2891, 6505" autocomplete="off">
+  </label>
+  <div class="etf-multi">
+    <div class="etf-multi-header">
+      <span class="title">ETF 篩選（可多選，留空 = 全部）</span>
+      <span>
+        <button type="button" class="link" data-target="stockEtfPick" data-action="all">全選</button>
+        <button type="button" class="link" data-target="stockEtfPick" data-action="none">清除</button>
+        <span id="stockEtfPickCount" style="margin-left:8px">已選 0 支</span>
+      </span>
+    </div>
+    <div class="etf-list" id="stockEtfPick"></div>
+  </div>
+  <div class="modes">
+    <label class="active"><input type="radio" name="stockMode" value="range" checked>區間</label>
+    <label><input type="radio" name="stockMode" value="daily">單日</label>
+    <label><input type="radio" name="stockMode" value="days">近 N 日</label>
+  </div>
+  <label class="stock-range">起始日 <input type="date" id="stockStart" value="2026-05-09"></label>
+  <label class="stock-range stock-days">截止日 <input type="date" id="stockEnd" value="2026-05-10"></label>
+  <label class="stock-daily" style="display:none">日期 <input type="date" id="stockDate" value="2026-05-10"></label>
+  <label class="stock-days" style="display:none">天數
+    <select id="stockDays"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
+  </label>
+  <button class="primary" id="runStock">查詢</button>
+</div>
+
+<!-- ETF 視角 -->
+<div class="controls" id="ctrlEtf" style="display:none">
+  <div class="etf-multi" data-target="etfPick">
+    <div class="etf-multi-header">
+      <span class="title">選擇 ETF（可多選）</span>
+      <span>
+        <button type="button" class="link" data-action="all">全選</button>
+        <button type="button" class="link" data-action="none">清除</button>
+        <span id="etfPickCount" style="margin-left:8px">已選 0 支</span>
+      </span>
+    </div>
+    <div class="etf-list" id="etfPick"></div>
+  </div>
+  <div class="modes">
+    <label class="active"><input type="radio" name="etfMode" value="range" checked>區間</label>
+    <label><input type="radio" name="etfMode" value="daily">單日</label>
+    <label><input type="radio" name="etfMode" value="days">近 N 日</label>
+  </div>
+  <label class="etf-range">起始日 <input type="date" id="etfStart" value="2026-05-09"></label>
+  <label class="etf-range etf-days">截止日 <input type="date" id="etfEnd" value="2026-05-10"></label>
+  <label class="etf-daily" style="display:none">日期 <input type="date" id="etfDate" value="2026-05-10"></label>
+  <label class="etf-days" style="display:none">天數
+    <select id="etfDays"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
+  </label>
+  <button class="primary" id="runEtf">查詢</button>
+</div>
+
+<!-- 當日新增股票 -->
+<div class="controls" id="ctrlAdded" style="display:none">
+  <label>日期 <input type="date" id="addedDate" value="2026-05-10"></label>
+  <label style="flex-direction:row; align-items:center; gap:6px">
+    <input type="checkbox" id="newOnly"> 只列「該 ETF 此前未持有」的新進場
+  </label>
+  <div class="etf-multi" data-target="addedEtfPick">
+    <div class="etf-multi-header">
+      <span class="title">ETF 篩選（可多選，留空 = 全部）</span>
+      <span>
+        <button type="button" class="link" data-action="all">全選</button>
+        <button type="button" class="link" data-action="none">清除</button>
+        <span id="addedEtfPickCount" style="margin-left:8px">已選 0 支</span>
+      </span>
+    </div>
+    <div class="etf-list" id="addedEtfPick"></div>
+  </div>
+  <button class="primary" id="runAdded">查詢</button>
+</div>
+
+
+<section class="results" id="results"></section>
+
+<div id="cal" class="hidden">
+  <div class="cal-head">
+    <button id="cal-prev">‹</button>
+    <span class="cal-title" id="cal-title"></span>
+    <button id="cal-next">›</button>
+  </div>
+  <div class="cal-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="cal-footer"><span>●</span> = 有資料</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const err = m => { $('err').textContent = m || ''; $('ok').textContent = ''; };
+const ok  = m => { $('ok').textContent  = m || ''; $('err').textContent = ''; };
+
+// ─── 日曆 widget (singleton popup) ───────────────────────────────────────
+const Cal = {
+  dates: new Set(),     // 有資料的日期集合
+  target: null,         // 目前綁定的 input element
+  viewYear: 0, viewMonth: 0,   // 月曆當前顯示年月
+
+  async loadDates() {
+    try {
+      const d = await (await fetch('api/dates')).json();
+      this.dates = new Set(d.dates);
+    } catch (e) { /* ignore */ }
+  },
+
+  open(inputEl) {
+    this.target = inputEl;
+    const val = inputEl.value || new Date().toISOString().slice(0, 10);
+    const [y, m] = val.split('-').map(Number);
+    this.viewYear = y;
+    this.viewMonth = m - 1;
+    this.render();
+    const pop = $('cal');
+    pop.classList.remove('hidden');
+    // 定位：對齊 input 下方
+    const r = inputEl.getBoundingClientRect();
+    pop.style.left = (window.scrollX + r.left) + 'px';
+    pop.style.top  = (window.scrollY + r.bottom + 4) + 'px';
+  },
+
+  close() { $('cal').classList.add('hidden'); this.target = null; },
+
+  render() {
+    const y = this.viewYear, m = this.viewMonth;
+    $('cal-title').textContent = `${y} / ${String(m + 1).padStart(2, '0')}`;
+    const first = new Date(y, m, 1);
+    const firstWeekday = first.getDay(); // 0=Sun
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const daysInPrev  = new Date(y, m, 0).getDate();
+    const selected    = this.target ? this.target.value : null;
+    const today       = new Date().toISOString().slice(0, 10);
+
+    const grid = $('cal-grid');
+    grid.innerHTML = '';
+
+    const fmt = (yy, mm, dd) =>
+      `${yy}-${String(mm + 1).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+
+    // 上個月填充
+    for (let i = firstWeekday - 1; i >= 0; i--) {
+      const dd = daysInPrev - i;
+      const iso = fmt(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1, dd);
+      grid.insertAdjacentHTML('beforeend', this.dayCell(iso, dd, 'cal-other-month', selected, today));
+    }
+    // 本月
+    for (let dd = 1; dd <= daysInMonth; dd++) {
+      const iso = fmt(y, m, dd);
+      grid.insertAdjacentHTML('beforeend', this.dayCell(iso, dd, '', selected, today));
+    }
+    // 下個月填充至 6 排
+    const cellsSoFar = firstWeekday + daysInMonth;
+    const trailing   = (7 - cellsSoFar % 7) % 7;
+    for (let dd = 1; dd <= trailing; dd++) {
+      const iso = fmt(m === 11 ? y + 1 : y, m === 11 ? 0 : m + 1, dd);
+      grid.insertAdjacentHTML('beforeend', this.dayCell(iso, dd, 'cal-other-month', selected, today));
+    }
+  },
+
+  dayCell(iso, dd, extraClass, selected, today) {
+    const classes = ['cal-day'];
+    if (extraClass) classes.push(extraClass);
+    if (this.dates.has(iso)) classes.push('cal-has-data');
+    if (iso === selected) classes.push('cal-selected');
+    if (iso === today)    classes.push('cal-today');
+    return `<div class="${classes.join(' ')}" data-iso="${iso}">${dd}</div>`;
+  },
+
+  pick(iso) {
+    if (!this.target) return;
+    this.target.value = iso;
+    // 觸發 change 事件給可能的 listener
+    this.target.dispatchEvent(new Event('change', { bubbles: true }));
+    this.close();
+  },
+
+  prev() {
+    if (--this.viewMonth < 0) { this.viewMonth = 11; this.viewYear--; }
+    this.render();
+  },
+  next() {
+    if (++this.viewMonth > 11) { this.viewMonth = 0; this.viewYear++; }
+    this.render();
+  },
+};
+
+// 綁定 calendar 全域事件
+$('cal-prev').addEventListener('click', () => Cal.prev());
+$('cal-next').addEventListener('click', () => Cal.next());
+$('cal-grid').addEventListener('click', (ev) => {
+  const cell = ev.target.closest('.cal-day');
+  if (cell && !cell.classList.contains('cal-empty')) Cal.pick(cell.dataset.iso);
+});
+// 點 popup 外面 → 關閉
+document.addEventListener('click', (ev) => {
+  if ($('cal').classList.contains('hidden')) return;
+  if (ev.target.closest('#cal')) return;
+  if (ev.target.matches('input[type=date]')) return;
+  Cal.close();
+});
+
+function fmtLots(lots) { const sign = lots > 0 ? '+' : ''; return `${sign}${lots} 張`; }
+function fmtDaily(daily) { return daily.map(d => `${d.date.slice(5)} ${fmtLots(d.change_lots)}`).join('  '); }
+
+// 股票代號 → 名稱 cache。loadPickers 時填入。
+const stockNameOf = new Map();
+const stockLabel = code => {
+  const name = stockNameOf.get(code);
+  return name ? `${code} ${name}` : code;
+};
+
+// ─── 載入多選清單 (ETF / 股票) ───
+async function loadPickers() {
+  const [etfData, stockData] = await Promise.all([
+    fetch('api/etfs/list').then(r => r.json()),
+    fetch('api/stocks/list').then(r => r.json()),
+  ]);
+  const etfHtml = etfData.etfs.map(e =>
+    `<label><input type="checkbox" value="${e}"> ${e}</label>`).join('');
+  // 股票清單現回 [{code, name}]：填 cache 並顯示「代號 名稱」
+  stockNameOf.clear();
+  for (const s of stockData.stocks) {
+    if (s.name) stockNameOf.set(s.code, s.name);
+  }
+  const stockHtml = stockData.stocks.map(s => {
+    const label = s.name ? `${s.code} ${s.name}` : s.code;
+    return `<label title="${label}"><input type="checkbox" value="${s.code}"> ${label}</label>`;
+  }).join('');
+  $('etfPick').innerHTML       = etfHtml;
+  $('addedEtfPick').innerHTML  = etfHtml;
+  $('stockEtfPick').innerHTML  = etfHtml;
+  $('stockPick').innerHTML     = stockHtml;
+
+  // 預設勾選
+  const firstEtf = $('etfPick').querySelector('input');
+  if (firstEtf) firstEtf.checked = true;
+  const default2330 = $('stockPick').querySelector('input[value="2330"]');
+  if (default2330) default2330.checked = true;
+  // checkbox 寬度依清單最長文字自動撐大
+  $('stockPick').style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
+
+  ['etfPick', 'addedEtfPick', 'stockEtfPick', 'stockPick'].forEach(attachPickHandlers);
+}
+
+function attachPickHandlers(listId) {
+  const list = $(listId);
+  const countId = list.closest('.etf-multi').querySelector('[id$="Count"]').id;
+  list.addEventListener('change', () => updatePickCount(listId, countId));
+  list.closest('.etf-multi').querySelectorAll('button.link[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const checked = btn.dataset.action === 'all';
+      list.querySelectorAll('input').forEach(cb => cb.checked = checked);
+      updatePickCount(listId, countId);
+    });
+  });
+  updatePickCount(listId, countId);
+}
+
+function updatePickCount(listId, countId) {
+  const n = $(listId).querySelectorAll('input:checked').length;
+  $(countId).textContent = `已選 ${n} 支`;
+}
+
+function getPicked(listId) {
+  return [...$(listId).querySelectorAll('input:checked')].map(cb => cb.value);
+}
+
+// ─── tabs ───
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    const v = t.dataset.view;
+    $('ctrlStock').style.display  = (v === 'stock')  ? 'grid' : 'none';
+    $('ctrlEtf').style.display    = (v === 'etf')    ? 'grid' : 'none';
+    $('ctrlAdded').style.display  = (v === 'added')  ? 'grid' : 'none';
+    $('results').innerHTML = '';
+    err('');
+  });
+});
+
+// ─── 個股視角 ───
+function syncStockUI() {
+  const m = document.querySelector('input[name=stockMode]:checked').value;
+  document.querySelectorAll('#ctrlStock .modes label').forEach(l =>
+    l.classList.toggle('active', l.querySelector('input').value === m));
+  $('ctrlStock').querySelector('.stock-range').style.display = (m === 'range') ? '' : 'none';
+  $('ctrlStock').querySelectorAll('.stock-daily').forEach(el => el.style.display = (m === 'daily') ? '' : 'none');
+  document.querySelectorAll('#ctrlStock .stock-days').forEach(el => el.style.display = (m === 'days') ? '' : 'none');
+  $('ctrlStock').querySelector('.stock-range.stock-days').style.display = (m === 'daily') ? 'none' : '';
+}
+document.querySelectorAll('input[name=stockMode]').forEach(r => r.addEventListener('change', syncStockUI));
+
+function renderPanels(panels) {
+  $('results').innerHTML = panels.map(p => `
+    <div class="panel">
+      <header><h2 class="${p.side}">${p.title}</h2><span class="count">${p.count}</span></header>
+      <table>${p.head ? `<thead>${p.head}</thead>` : ''}<tbody>${p.body}</tbody></table>
+    </div>
+  `).join('');
+}
+
+async function runStock() {
+  err('');
+  const picked = getPicked('stockPick');
+  const extra  = $('stockExtra').value.split(',').map(s => s.trim()).filter(Boolean);
+  const stocks = [...new Set([...picked, ...extra])];
+  if (stocks.length === 0) return err('請至少選一支股票或輸入額外代號');
+
+  const etfFilter = getPicked('stockEtfPick');
+  const m = document.querySelector('input[name=stockMode]:checked').value;
+  const endpoint = (m === 'daily') ? 'daily' : 'range';
+  const q = new URLSearchParams();
+  q.set('stocks', stocks.join(','));
+  if (etfFilter.length > 0) q.set('etfs', etfFilter.join(','));
+  if (m === 'daily') q.set('date', $('stockDate').value);
+  else if (m === 'days') { q.set('days', $('stockDays').value); q.set('end', $('stockEnd').value); }
+  else { q.set('start', $('stockStart').value); q.set('end', $('stockEnd').value); }
+
+  const res = await fetch(`api/${endpoint}?${q}`);
+  const data = await res.json();
+  if (!res.ok) return err(data.error);
+
+  const dateLabel = (m === 'daily') ? $('stockDate').value
+    : (m === 'days') ? `近 ${$('stockDays').value} 日 (~${$('stockEnd').value})`
+    : `${$('stockStart').value} ~ ${$('stockEnd').value}`;
+  const filterTag = (etfFilter.length === 0) ? '' : ` (限 ${etfFilter.length} 支 ETF)`;
+
+  const head = (m === 'daily')
+    ? `<tr><th>ETF</th><th>變動</th><th>目前持有</th></tr>`
+    : `<tr><th>ETF</th><th>今日累計</th><th>目前已累積</th><th>每日明細</th></tr>`;
+  const rowOf = (r, side) => (m === 'daily')
+    ? `<tr><td class="etf">${r.etf_code}</td><td class="num ${side}">${fmtLots(r.change_lots)}</td><td class="num">${r.today_lots != null ? r.today_lots + ' 張' : '—'}</td></tr>`
+    : `<tr><td class="etf">${r.etf_code}</td><td class="num ${side}">${fmtLots(r.total_lots)}</td><td class="num">${r.end_lots != null ? r.end_lots + ' 張' : '—'}</td><td class="daily">${fmtDaily(r.daily)}</td></tr>`;
+  const emptyRow = `<tr><td colspan="${m === 'daily' ? 3 : 4}" class="empty">無</td></tr>`;
+
+  // 後端：1 支且無 etfFilter → 舊形狀 (data.buys/sells)；其餘 → data.results[]
+  const results = data.results || [{ stock: data.stock || stocks[0], buys: data.buys, sells: data.sells }];
+
+  const panels = [];
+  for (const one of results) {
+    panels.push(
+      { side:'buy',  title:`${one.stock} · ${dateLabel} 買入${filterTag}`, count:`${one.buys.length} ETF`,
+        head, body:(one.buys.length  ? one.buys.map(r => rowOf(r,'buy')).join('')   : emptyRow) },
+      { side:'sell', title:`${one.stock} · ${dateLabel} 賣出${filterTag}`, count:`${one.sells.length} ETF`,
+        head, body:(one.sells.length ? one.sells.map(r => rowOf(r,'sell')).join(''): emptyRow) },
+    );
+  }
+  renderPanels(panels);
+}
+$('runStock').addEventListener('click', runStock);
+
+// ─── ETF 視角（多選） ───
+function syncEtfUI() {
+  const m = document.querySelector('input[name=etfMode]:checked').value;
+  document.querySelectorAll('#ctrlEtf .modes label').forEach(l =>
+    l.classList.toggle('active', l.querySelector('input').value === m));
+  $('ctrlEtf').querySelector('.etf-range').style.display = (m === 'range') ? '' : 'none';
+  $('ctrlEtf').querySelectorAll('.etf-daily').forEach(el => el.style.display = (m === 'daily') ? '' : 'none');
+  document.querySelectorAll('#ctrlEtf .etf-days').forEach(el => el.style.display = (m === 'days') ? '' : 'none');
+  $('ctrlEtf').querySelector('.etf-range.etf-days').style.display = (m === 'daily') ? 'none' : '';
+}
+document.querySelectorAll('input[name=etfMode]').forEach(r => r.addEventListener('change', syncEtfUI));
+
+async function runEtf() {
+  err('');
+  const etfs = getPicked('etfPick');
+  if (etfs.length === 0) return err('請至少選一支 ETF');
+  const m = document.querySelector('input[name=etfMode]:checked').value;
+  let q = `etfs=${etfs.join(',')}`;
+  if (m === 'daily') q += `&date=${$('etfDate').value}`;
+  else if (m === 'days') q += `&days=${$('etfDays').value}&end=${$('etfEnd').value}`;
+  else q += `&start=${$('etfStart').value}&end=${$('etfEnd').value}`;
+  const res = await fetch(`api/etf?${q}`);
+  const data = await res.json();
+  if (!res.ok) return err(data.error);
+
+  const dateLabel = (m === 'daily') ? $('etfDate').value
+    : (m === 'days') ? `近 ${$('etfDays').value} 日 (~${$('etfEnd').value})`
+    : `${$('etfStart').value} ~ ${$('etfEnd').value}`;
+
+  const head = (m === 'daily')
+    ? `<tr><th>股票</th><th>變動</th><th>目前持有</th></tr>`
+    : `<tr><th>股票</th><th>今日累計</th><th>目前已累積</th><th>每日明細</th></tr>`;
+  const rowOf = (r, side) => (m === 'daily')
+    ? `<tr><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.change_lots)}</td><td class="num">${r.today_lots != null ? r.today_lots + ' 張' : '—'}</td></tr>`
+    : `<tr><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.total_lots)}</td><td class="daily">${fmtDaily(r.daily)}</td></tr>`;
+  const emptyRow = `<tr><td colspan="${m === 'daily' ? 3 : 4}" class="empty">無</td></tr>`;
+
+  const panels = [];
+  for (const one of data.results) {
+    panels.push(
+      { side:'buy',  title:`${one.etf} · ${dateLabel} 買入`, count:`${one.buys.length} 股`,
+        head, body:(one.buys.length  ? one.buys.map(r => rowOf(r,'buy')).join('')   : emptyRow) },
+      { side:'sell', title:`${one.etf} · ${dateLabel} 賣出`, count:`${one.sells.length} 股`,
+        head, body:(one.sells.length ? one.sells.map(r => rowOf(r,'sell')).join(''): emptyRow) },
+    );
+  }
+  renderPanels(panels);
+}
+$('runEtf').addEventListener('click', runEtf);
+
+// ─── 當日新增股票 ───
+async function runAdded() {
+  err('');
+  const date = $('addedDate').value;
+  const newOnly = $('newOnly').checked;
+  const etfFilter = getPicked('addedEtfPick');
+  let q = `date=${date}`;
+  if (newOnly) q += '&newOnly=true';
+  if (etfFilter.length > 0) q += `&etfs=${etfFilter.join(',')}`;
+  const res = await fetch(`api/added-stocks?${q}`);
+  const data = await res.json();
+  if (!res.ok) return err(data.error);
+
+  const filterLabel = (etfFilter.length === 0) ? '全部 ETF'
+    : `限 ${etfFilter.length} 支 ETF`;
+  const tag = newOnly ? '新進場（newOnly）' : '買入（含加碼）';
+  const title = `${date} ${filterLabel} ${tag}`;
+  const head = `<tr><th>股票</th><th>當日總買入</th><th>ETF 數</th><th>明細</th></tr>`;
+  const rowOf = r => `<tr>
+    <td class="stock">${stockLabel(r.stock_code)}</td>
+    <td class="num buy">${fmtLots(r.total_lots)}</td>
+    <td class="daily">${r.etf_count}</td>
+    <td class="daily">${r.etfs.map(e => `<span class="etf-pill buy">${e.etf_code} ${fmtLots(e.change_lots)}</span>`).join('')}</td>
+  </tr>`;
+  const body = data.items.length
+    ? data.items.map(rowOf).join('')
+    : `<tr><td colspan="4" class="empty">無</td></tr>`;
+
+  renderPanels([{ side:'buy', title, count:`${data.items.length} 股票`, head, body }]);
+}
+$('runAdded').addEventListener('click', runAdded);
+
+// ─── CSV 匯入 ───
+
+// ─── 啟動 ───
+async function loadDbStatus() {
+  try {
+    const d = await (await fetch('api/db-info')).json();
+    const sub = $('dbStatus');
+    if (d.rows === 0) {
+      sub.textContent = 'DB 空白。請至「匯入 CSV」上傳檔案，或執行 `node fetch.js 0050 0056 --ingest`。';
+      return;
+    }
+    sub.textContent =
+      `DB 共 ${d.rows} 筆 snapshot · ${d.etfs} 支 ETF · ${d.stocks} 支股票 · ` +
+      `日期 ${d.min_date} ~ ${d.max_date}` +
+      (d.min_date === d.max_date ? '（只有單日，要兩日以上才能算買賣 diff）' : '');
+    // 日期預設今日（不再對齊 DB 範圍）
+  } catch (e) { /* ignore */ }
+}
+
+(async () => {
+  syncStockUI();
+  syncEtfUI();
+
+  // 所有日期 input 預設前一天（ETF PCF 通常 T+1 揭露，前一天才有資料）
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  document.querySelectorAll('input[type=date]').forEach(el => { el.value = yesterday; });
+
+  await Promise.all([loadDbStatus(), loadPickers(), Cal.loadDates()]);
+
+  // collapsible toggle 按鈕
+  document.querySelectorAll('.etf-multi.collapsible .link.toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const wrap = btn.closest('.etf-multi');
+      wrap.classList.toggle('collapsed');
+      btn.textContent = wrap.classList.contains('collapsed') ? '▾ 展開' : '▴ 收合';
+    });
+  });
+
+  // 攔截所有日期 input，點擊改用自製日曆
+  document.querySelectorAll('input[type=date]').forEach(el => {
+    el.addEventListener('focus', (ev) => { ev.preventDefault(); Cal.open(el); });
+    el.addEventListener('mousedown', (ev) => { ev.preventDefault(); Cal.open(el); el.blur(); });
+  });
+
+  // 刷新按鈕：立刻抓最新資料並重新整理頁面
+  $('refreshBtn').addEventListener('click', async () => {
+    const btn = $('refreshBtn');
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ 抓取中…（約 5~20 秒）';
+    err('');
+    try {
+      const r = await fetch('api/refresh', { method: 'POST' });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      ok(`✓ 抓到 ${data.ingested} rows，DB 共 ${data.total_rows} 筆。錯誤 ${data.errors.length} 筆。`);
+      // 重載日曆可用日期 + DB 狀態
+      await Promise.all([Cal.loadDates(), loadDbStatus()]);
+    } catch (e) {
+      err('刷新失敗：' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  });
+
+  runStock();
+})();
+</script>
+<script src="/kitty.js"></script>
+</body>
+</html>

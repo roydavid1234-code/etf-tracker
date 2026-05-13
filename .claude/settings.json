@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/roy/.claude/ 2>/dev/null; echo \"---\"; ls /Users/roy/ETF/.claude/ 2>/dev/null; echo \"---\"; ls /Users/roy/ETF/ | grep -i mcp 2>/dev/null)",
+      "Read(//Users/roy/.claude/**)"
+    ]
+  }
+}
