@@ -127,7 +127,7 @@ const snapshotsAllEtfs = [...snapshotsExtended, ..._newEtfData];
 // UI 多選用的 ETF 清單（依使用者指定順序）
 const ETF_LIST = [
   '0050', '0056', '00878',
-  '00981A', '00987A', '00991A', '00992A', '00994A',
+  '00981A', '00991A', '00992A', '00994A',
 ];
 
 module.exports = { snapshots, snapshotsExtended, snapshotsAllEtfs, ETF_LIST };
