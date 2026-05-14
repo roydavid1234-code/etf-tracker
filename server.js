@@ -384,6 +384,7 @@ function parseCsvSnapshots(text) {
     snapshot_date: header.indexOf('snapshot_date'),
     shares:        header.indexOf('shares'),
     stock_name:    header.indexOf('stock_name'), // -1 if absent
+    weight:        header.indexOf('weight'),     // -1 if absent
   };
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -395,12 +396,18 @@ function parseCsvSnapshots(text) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(cols[idx.snapshot_date])) {
       throw new Error(`Row ${i + 1}: snapshot_date must be YYYY-MM-DD`);
     }
+    let weight = null;
+    if (idx.weight >= 0 && cols[idx.weight] !== '' && cols[idx.weight] != null) {
+      const w = parseFloat(cols[idx.weight]);
+      weight = Number.isFinite(w) ? w : null;
+    }
     rows.push({
       etf_code:      cols[idx.etf_code],
       stock_code:    cols[idx.stock_code],
       snapshot_date: cols[idx.snapshot_date],
       shares,
       stock_name:    idx.stock_name >= 0 ? (cols[idx.stock_name] || null) : null,
+      weight,
     });
   }
   return rows;

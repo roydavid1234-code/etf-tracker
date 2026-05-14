@@ -30,10 +30,11 @@ function parseArgs(argv) {
 }
 
 function toCsv(rows) {
-  const lines = ['etf_code,stock_code,snapshot_date,shares,stock_name'];
+  const lines = ['etf_code,stock_code,snapshot_date,shares,stock_name,weight'];
   for (const r of rows) {
     const name = ((r.stock_name || '') + '').replace(/[,\r\n]/g, '/').trim();
-    lines.push(`${r.etf_code},${r.stock_code},${r.snapshot_date},${r.shares},${name}`);
+    const weight = (r.weight == null) ? '' : r.weight;
+    lines.push(`${r.etf_code},${r.stock_code},${r.snapshot_date},${r.shares},${name},${weight}`);
   }
   return lines.join('\n');
 }
