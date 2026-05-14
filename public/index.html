@@ -515,27 +515,44 @@ async function runStock() {
     : `${$('stockStart').value} ~ ${$('stockEnd').value}`;
   const filterTag = (etfFilter.length === 0) ? '' : ` (限 ${etfFilter.length} 支 ETF)`;
 
+  // 統一表格：ETF / 股票 / 變動 / 目前持有 / 每日明細
   const head = (m === 'daily')
-    ? `<tr><th>ETF</th><th>變動</th><th>目前持有</th></tr>`
-    : `<tr><th>ETF</th><th>今日累計</th><th>目前已累積</th><th>每日明細</th></tr>`;
+    ? `<tr><th>ETF</th><th>股票</th><th>變動</th><th>目前持有</th></tr>`
+    : `<tr><th>ETF</th><th>股票</th><th>今日累計</th><th>目前已累積</th><th>每日明細</th></tr>`;
   const rowOf = (r, side) => (m === 'daily')
-    ? `<tr><td class="etf">${r.etf_code}</td><td class="num ${side}">${fmtLots(r.change_lots)}</td><td class="num">${r.today_lots != null ? r.today_lots + ' 張' : '—'}</td></tr>`
-    : `<tr><td class="etf">${r.etf_code}</td><td class="num ${side}">${fmtLots(r.total_lots)}</td><td class="num">${r.end_lots != null ? r.end_lots + ' 張' : '—'}</td><td class="daily">${fmtDaily(r.daily)}</td></tr>`;
-  const emptyRow = `<tr><td colspan="${m === 'daily' ? 3 : 4}" class="empty">無</td></tr>`;
+    ? `<tr><td class="etf">${r.etf_code}</td><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.change_lots)}</td><td class="num">${r.today_lots != null ? r.today_lots + ' 張' : '—'}</td></tr>`
+    : `<tr><td class="etf">${r.etf_code}</td><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.total_lots)}</td><td class="num">${r.end_lots != null ? r.end_lots + ' 張' : '—'}</td><td class="daily">${fmtDaily(r.daily)}</td></tr>`;
 
   // 後端：1 支且無 etfFilter → 舊形狀 (data.buys/sells)；其餘 → data.results[]
   const results = data.results || [{ stock: data.stock || stocks[0], buys: data.buys, sells: data.sells }];
 
-  const panels = [];
+  // 把所有股票的買賣攤平成兩張大表
+  const allBuys = [], allSells = [];
   for (const one of results) {
-    panels.push(
-      { side:'buy',  title:`${one.stock} · ${dateLabel} 買入${filterTag}`, count:`${one.buys.length} ETF`,
-        head, body:(one.buys.length  ? one.buys.map(r => rowOf(r,'buy')).join('')   : emptyRow) },
-      { side:'sell', title:`${one.stock} · ${dateLabel} 賣出${filterTag}`, count:`${one.sells.length} ETF`,
-        head, body:(one.sells.length ? one.sells.map(r => rowOf(r,'sell')).join(''): emptyRow) },
-    );
+    for (const r of one.buys)  allBuys.push({ ...r, stock_code: one.stock });
+    for (const r of one.sells) allSells.push({ ...r, stock_code: one.stock });
   }
-  renderPanels(panels);
+  // 排序：股票代號 ASC → ETF 代號 ASC（資料集中、好對齊）
+  const sortFn = (a, b) =>
+    a.stock_code < b.stock_code ? -1 : a.stock_code > b.stock_code ? 1 :
+    a.etf_code   < b.etf_code   ? -1 : a.etf_code   > b.etf_code   ? 1 : 0;
+  allBuys.sort(sortFn);
+  allSells.sort(sortFn);
+
+  const panels = [];
+  if (allBuys.length > 0) panels.push({
+    side: 'buy',  title: `${dateLabel} 買入${filterTag}`, count: `${allBuys.length} 筆`,
+    head, body: allBuys.map(r => rowOf(r, 'buy')).join(''),
+  });
+  if (allSells.length > 0) panels.push({
+    side: 'sell', title: `${dateLabel} 賣出${filterTag}`, count: `${allSells.length} 筆`,
+    head, body: allSells.map(r => rowOf(r, 'sell')).join(''),
+  });
+  if (panels.length === 0) {
+    $('results').innerHTML = `<div class="empty" style="padding:32px; text-align:center; color:var(--muted)">本次查詢無任何買賣資料</div>`;
+  } else {
+    renderPanels(panels);
+  }
 }
 $('runStock').addEventListener('click', runStock);
 
@@ -568,24 +585,41 @@ async function runEtf() {
     : (m === 'days') ? `近 ${$('etfDays').value} 日 (~${$('etfEnd').value})`
     : `${$('etfStart').value} ~ ${$('etfEnd').value}`;
 
+  // 統一表格：ETF / 股票 / 變動 / 目前持有 / 每日明細
   const head = (m === 'daily')
-    ? `<tr><th>股票</th><th>變動</th><th>目前持有</th></tr>`
-    : `<tr><th>股票</th><th>今日累計</th><th>目前已累積</th><th>每日明細</th></tr>`;
+    ? `<tr><th>ETF</th><th>股票</th><th>變動</th><th>目前持有</th></tr>`
+    : `<tr><th>ETF</th><th>股票</th><th>今日累計</th><th>目前已累積</th><th>每日明細</th></tr>`;
   const rowOf = (r, side) => (m === 'daily')
-    ? `<tr><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.change_lots)}</td><td class="num">${r.today_lots != null ? r.today_lots + ' 張' : '—'}</td></tr>`
-    : `<tr><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.total_lots)}</td><td class="daily">${fmtDaily(r.daily)}</td></tr>`;
-  const emptyRow = `<tr><td colspan="${m === 'daily' ? 3 : 4}" class="empty">無</td></tr>`;
+    ? `<tr><td class="etf">${r.etf_code}</td><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.change_lots)}</td><td class="num">${r.today_lots != null ? r.today_lots + ' 張' : '—'}</td></tr>`
+    : `<tr><td class="etf">${r.etf_code}</td><td class="stock">${stockLabel(r.stock_code)}</td><td class="num ${side}">${fmtLots(r.total_lots)}</td><td class="num">${r.end_lots != null ? r.end_lots + ' 張' : '—'}</td><td class="daily">${fmtDaily(r.daily)}</td></tr>`;
+
+  // 把所有 ETF 的買賣攤平成兩張大表
+  const allBuys = [], allSells = [];
+  for (const one of data.results) {
+    for (const r of one.buys)  allBuys.push({ ...r, etf_code: one.etf });
+    for (const r of one.sells) allSells.push({ ...r, etf_code: one.etf });
+  }
+  // 排序：ETF 代號 ASC → 股票代號 ASC
+  const sortFn = (a, b) =>
+    a.etf_code   < b.etf_code   ? -1 : a.etf_code   > b.etf_code   ? 1 :
+    a.stock_code < b.stock_code ? -1 : a.stock_code > b.stock_code ? 1 : 0;
+  allBuys.sort(sortFn);
+  allSells.sort(sortFn);
 
   const panels = [];
-  for (const one of data.results) {
-    panels.push(
-      { side:'buy',  title:`${one.etf} · ${dateLabel} 買入`, count:`${one.buys.length} 股`,
-        head, body:(one.buys.length  ? one.buys.map(r => rowOf(r,'buy')).join('')   : emptyRow) },
-      { side:'sell', title:`${one.etf} · ${dateLabel} 賣出`, count:`${one.sells.length} 股`,
-        head, body:(one.sells.length ? one.sells.map(r => rowOf(r,'sell')).join(''): emptyRow) },
-    );
+  if (allBuys.length > 0) panels.push({
+    side: 'buy',  title: `${dateLabel} 買入`, count: `${allBuys.length} 筆`,
+    head, body: allBuys.map(r => rowOf(r, 'buy')).join(''),
+  });
+  if (allSells.length > 0) panels.push({
+    side: 'sell', title: `${dateLabel} 賣出`, count: `${allSells.length} 筆`,
+    head, body: allSells.map(r => rowOf(r, 'sell')).join(''),
+  });
+  if (panels.length === 0) {
+    $('results').innerHTML = `<div class="empty" style="padding:32px; text-align:center; color:var(--muted)">本次查詢無任何買賣資料</div>`;
+  } else {
+    renderPanels(panels);
   }
-  renderPanels(panels);
 }
 $('runEtf').addEventListener('click', runEtf);
 
@@ -613,10 +647,11 @@ async function runAdded() {
     <td class="daily">${r.etf_count}</td>
     <td class="daily">${r.etfs.map(e => `<span class="etf-pill buy">${e.etf_code} ${fmtLots(e.change_lots)}</span>`).join('')}</td>
   </tr>`;
-  const body = data.items.length
-    ? data.items.map(rowOf).join('')
-    : `<tr><td colspan="4" class="empty">無</td></tr>`;
-
+  if (data.items.length === 0) {
+    $('results').innerHTML = `<div class="empty" style="padding:32px; text-align:center; color:var(--muted)">本次查詢無任何買賣資料</div>`;
+    return;
+  }
+  const body = data.items.map(rowOf).join('');
   renderPanels([{ side:'buy', title, count:`${data.items.length} 股票`, head, body }]);
 }
 $('runAdded').addEventListener('click', runAdded);
