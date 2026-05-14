@@ -1,7 +1,7 @@
 node_modules/
-data/
+data/*
+!data/etf.sqlite
 daily-snapshots/
-*.sqlite
 *.sqlite-journal
 .env
 *.log
