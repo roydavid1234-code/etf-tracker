@@ -195,7 +195,7 @@ const server = http.createServer((req, res) => {
     // 立即刷新：抓 yuanta + etfedge 所有 ETF，灌進 DB
     if (req.method === 'POST' && url.pathname === '/api/refresh') {
       const yuantaList = ['0050', '0056'];
-      const etfedgeList = ['00981A', '00991A', '00992A'];
+      const etfedgeList = ['00981A', '00987A', '00991A', '00992A', '00994A'];
       const { fetchYuantaPcf } = require('./lib/fetchers/yuanta');
       const { fetchEtfedge } = require('./lib/fetchers/etfedge-research');
       (async () => {

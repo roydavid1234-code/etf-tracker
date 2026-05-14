@@ -19,8 +19,10 @@
     <string>/usr/local/bin/node</string>
     <string>/Users/roy/ETF/fetch-etfedge.js</string>
     <string>00981A</string>
+    <string>00987A</string>
     <string>00991A</string>
     <string>00992A</string>
+    <string>00994A</string>
     <string>--ingest</string>
   </array>
 
