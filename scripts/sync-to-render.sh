@@ -22,6 +22,14 @@ LOG="$REPO/scripts/sync.log"
     exit 1
   fi
 
+  echo "[step 1.5] checkpoint WAL into main db file"
+  # SQLite WAL mode keeps new writes in etf.sqlite-wal; git only sees the main
+  # file. Without this checkpoint we'd push a DB missing the latest day.
+  if ! sqlite3 "$REPO/data/etf.sqlite" "PRAGMA wal_checkpoint(TRUNCATE);"; then
+    echo "[error] wal checkpoint failed, abort sync"
+    exit 1
+  fi
+
   echo "[step 2] check db change"
   if git diff --quiet data/etf.sqlite 2>/dev/null && \
      ! git status --porcelain data/etf.sqlite | grep -q .; then
