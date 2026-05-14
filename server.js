@@ -53,7 +53,7 @@ if (isNewDb && !skipSeed) {
 
 // 從 DB 載入 snapshots 陣列供純函式查詢使用（ETF 視角、added-stocks）
 let snapshots = db.prepare(
-  'SELECT etf_code, stock_code, snapshot_date, shares FROM holding_snapshot'
+  'SELECT etf_code, stock_code, snapshot_date, shares, weight FROM holding_snapshot'
 ).all();
 console.log(`[init] loaded ${snapshots.length} snapshot rows`);
 
