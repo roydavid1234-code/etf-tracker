@@ -204,14 +204,17 @@
   <div class="modes">
     <label class="active"><input type="radio" name="stockMode" value="range" checked>區間</label>
     <label><input type="radio" name="stockMode" value="daily">單日</label>
-    <label><input type="radio" name="stockMode" value="days">近 N 日</label>
+    <label><input type="radio" name="stockMode" value="days1">近1日</label>
+    <label><input type="radio" name="stockMode" value="days2">近2日</label>
+    <label><input type="radio" name="stockMode" value="days3">近3日</label>
+    <label><input type="radio" name="stockMode" value="days4">近4日</label>
+    <label><input type="radio" name="stockMode" value="days5">近5日</label>
+    <label><input type="radio" name="stockMode" value="days6">近6日</label>
+    <label><input type="radio" name="stockMode" value="days7">近7日</label>
   </div>
   <label class="stock-range">起始日 <input type="date" id="stockStart" value="2026-05-09"></label>
   <label class="stock-range stock-days">截止日 <input type="date" id="stockEnd" value="2026-05-10"></label>
   <label class="stock-daily" style="display:none">日期 <input type="date" id="stockDate" value="2026-05-10"></label>
-  <label class="stock-days" style="display:none">天數
-    <select id="stockDays"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
-  </label>
   <button class="primary" id="runStock">查詢</button>
 </div>
 
@@ -231,14 +234,17 @@
   <div class="modes">
     <label class="active"><input type="radio" name="etfMode" value="range" checked>區間</label>
     <label><input type="radio" name="etfMode" value="daily">單日</label>
-    <label><input type="radio" name="etfMode" value="days">近 N 日</label>
+    <label><input type="radio" name="etfMode" value="days1">近1日</label>
+    <label><input type="radio" name="etfMode" value="days2">近2日</label>
+    <label><input type="radio" name="etfMode" value="days3">近3日</label>
+    <label><input type="radio" name="etfMode" value="days4">近4日</label>
+    <label><input type="radio" name="etfMode" value="days5">近5日</label>
+    <label><input type="radio" name="etfMode" value="days6">近6日</label>
+    <label><input type="radio" name="etfMode" value="days7">近7日</label>
   </div>
   <label class="etf-range">起始日 <input type="date" id="etfStart" value="2026-05-09"></label>
   <label class="etf-range etf-days">截止日 <input type="date" id="etfEnd" value="2026-05-10"></label>
   <label class="etf-daily" style="display:none">日期 <input type="date" id="etfDate" value="2026-05-10"></label>
-  <label class="etf-days" style="display:none">天數
-    <select id="etfDays"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
-  </label>
   <button class="primary" id="runEtf">查詢</button>
 </div>
 
@@ -477,14 +483,17 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 // ─── 個股視角 ───
+// 模式值：range / daily / days1..days7。daysOf 取 N（0 表示非 daysN 模式）
+const daysOf = m => m.startsWith('days') ? Number(m.slice(4)) : 0;
+
 function syncStockUI() {
   const m = document.querySelector('input[name=stockMode]:checked').value;
   document.querySelectorAll('#ctrlStock .modes label').forEach(l =>
     l.classList.toggle('active', l.querySelector('input').value === m));
-  $('ctrlStock').querySelector('.stock-range').style.display = (m === 'range') ? '' : 'none';
-  $('ctrlStock').querySelectorAll('.stock-daily').forEach(el => el.style.display = (m === 'daily') ? '' : 'none');
-  document.querySelectorAll('#ctrlStock .stock-days').forEach(el => el.style.display = (m === 'days') ? '' : 'none');
-  $('ctrlStock').querySelector('.stock-range.stock-days').style.display = (m === 'daily') ? 'none' : '';
+  const isRange = m === 'range', isDaily = m === 'daily';
+  $('ctrlStock').querySelector('.stock-range').style.display = isRange ? '' : 'none';            // 起始日：僅區間
+  $('ctrlStock').querySelector('.stock-range.stock-days').style.display = isDaily ? 'none' : ''; // 截止日：區間 + 近N日
+  $('ctrlStock').querySelector('.stock-daily').style.display = isDaily ? '' : 'none';            // 日期：僅單日
 }
 document.querySelectorAll('input[name=stockMode]').forEach(r => r.addEventListener('change', syncStockUI));
 
@@ -506,12 +515,13 @@ async function runStock() {
 
   const etfFilter = getPicked('stockEtfPick');
   const m = document.querySelector('input[name=stockMode]:checked').value;
+  const daysN = daysOf(m);
   const endpoint = (m === 'daily') ? 'daily' : 'range';
   const q = new URLSearchParams();
   q.set('stocks', stocks.join(','));
   if (etfFilter.length > 0) q.set('etfs', etfFilter.join(','));
   if (m === 'daily') q.set('date', $('stockDate').value);
-  else if (m === 'days') { q.set('days', $('stockDays').value); q.set('end', $('stockEnd').value); }
+  else if (daysN > 0) { q.set('days', daysN); q.set('end', $('stockEnd').value); }
   else { q.set('start', $('stockStart').value); q.set('end', $('stockEnd').value); }
 
   const res = await fetch(`api/${endpoint}?${q}`);
@@ -519,7 +529,7 @@ async function runStock() {
   if (!res.ok) return err(data.error);
 
   const dateLabel = (m === 'daily') ? $('stockDate').value
-    : (m === 'days') ? `近 ${$('stockDays').value} 日 (~${$('stockEnd').value})`
+    : (daysN > 0) ? `近 ${daysN} 日 (~${$('stockEnd').value})`
     : `${$('stockStart').value} ~ ${$('stockEnd').value}`;
   const filterTag = (etfFilter.length === 0) ? '' : ` (限 ${etfFilter.length} 支 ETF)`;
 
@@ -569,10 +579,10 @@ function syncEtfUI() {
   const m = document.querySelector('input[name=etfMode]:checked').value;
   document.querySelectorAll('#ctrlEtf .modes label').forEach(l =>
     l.classList.toggle('active', l.querySelector('input').value === m));
-  $('ctrlEtf').querySelector('.etf-range').style.display = (m === 'range') ? '' : 'none';
-  $('ctrlEtf').querySelectorAll('.etf-daily').forEach(el => el.style.display = (m === 'daily') ? '' : 'none');
-  document.querySelectorAll('#ctrlEtf .etf-days').forEach(el => el.style.display = (m === 'days') ? '' : 'none');
-  $('ctrlEtf').querySelector('.etf-range.etf-days').style.display = (m === 'daily') ? 'none' : '';
+  const isRange = m === 'range', isDaily = m === 'daily';
+  $('ctrlEtf').querySelector('.etf-range').style.display = isRange ? '' : 'none';            // 起始日：僅區間
+  $('ctrlEtf').querySelector('.etf-range.etf-days').style.display = isDaily ? 'none' : '';   // 截止日：區間 + 近N日
+  $('ctrlEtf').querySelector('.etf-daily').style.display = isDaily ? '' : 'none';            // 日期：僅單日
 }
 document.querySelectorAll('input[name=etfMode]').forEach(r => r.addEventListener('change', syncEtfUI));
 
@@ -581,16 +591,17 @@ async function runEtf() {
   const etfs = getPicked('etfPick');
   if (etfs.length === 0) return err('請至少選一支 ETF');
   const m = document.querySelector('input[name=etfMode]:checked').value;
+  const daysN = daysOf(m);
   let q = `etfs=${etfs.join(',')}`;
   if (m === 'daily') q += `&date=${$('etfDate').value}`;
-  else if (m === 'days') q += `&days=${$('etfDays').value}&end=${$('etfEnd').value}`;
+  else if (daysN > 0) q += `&days=${daysN}&end=${$('etfEnd').value}`;
   else q += `&start=${$('etfStart').value}&end=${$('etfEnd').value}`;
   const res = await fetch(`api/etf?${q}`);
   const data = await res.json();
   if (!res.ok) return err(data.error);
 
   const dateLabel = (m === 'daily') ? $('etfDate').value
-    : (m === 'days') ? `近 ${$('etfDays').value} 日 (~${$('etfEnd').value})`
+    : (daysN > 0) ? `近 ${daysN} 日 (~${$('etfEnd').value})`
     : `${$('etfStart').value} ~ ${$('etfEnd').value}`;
 
   // 統一表格：ETF / 股票 / 變動 / 目前持有 / [每日明細] / 權重變化 / 目前權重
